@@ -13,7 +13,6 @@
 
 #include <time.h>
 
-
 unsigned int Global_BufferLength = 0;
 unsigned int Global_NumberOfProducers = 0;
 unsigned int Global_NumberOfBuffers=0;
@@ -25,13 +24,13 @@ struct Buffer // Buffer
 	unsigned int start, end;
 };
 
-void QueueInsertElement(struct Buffer * pointerToBuffer, unsigned int Element)
+void BufferInsertElement(struct Buffer * pointerToBuffer, unsigned int Element) // Done
 {
 	pointerToBuffer->intBuffer[pointerToBuffer->end] = Element;
 	pointerToBuffer->end++;
 	pointerToBuffer->end %= Global_BufferLength;
 }
-unsigned int QueueGetElement(struct Buffer * pointerToBuffer)
+unsigned int BufferGetElement(struct Buffer * pointerToBuffer) // Done
 {
 	unsigned int Element = pointerToBuffer->intBuffer[pointerToBuffer->start];
 	pointerToBuffer->start++;
@@ -44,18 +43,18 @@ struct PriorityQueue * BindQueues()
 	static int ShmId = 0;
 	if(ShmId == 0)
 		ShmId = shmget(IPC_PRIVATE, N_PRIORITIES * sizeof(struct PriorityQueue) + N_PRIORITIES * Global_QueueLength * sizeof(unsigned int), SHM_W | SHM_R);
-	
+
 	if(ShmId <= 0)
 	{
 		printf("shmget failed...\n");
 		abort();
 	}
 	void * Data = shmat(ShmId, NULL, 0);
-	
+
 	struct PriorityQueue * Queues = (struct PriorityQueue *) Data;
 	for(unsigned int I = 0; I < N_PRIORITIES; I++)
 		Queues[I].Alarms = Data + N_PRIORITIES * sizeof(struct PriorityQueue) + I * Global_QueueLength * sizeof(unsigned int);
-	
+
 	return Queues;
 }
 struct PriorityQueue * InitQueues()
@@ -67,8 +66,8 @@ struct PriorityQueue * InitQueues()
 
 struct ProjectSemaphores
 {
-	sem_t QueueLock[N_PRIORITIES];
-	sem_t QueueFreeSpace[N_PRIORITIES];
+	sem_t BufferLock[Global_NumberOfBuffers];
+	sem_t BufferFreeSpace[Global_NumberOfBuffers];
 	sem_t DataInQueues;
 };
 struct ProjectSemaphores * BindSemaphores()
@@ -76,7 +75,7 @@ struct ProjectSemaphores * BindSemaphores()
 	static int ShmId = 0;
 	if(ShmId == 0)
 		ShmId = shmget(IPC_PRIVATE, sizeof(struct ProjectSemaphores), SHM_W | SHM_R);
-	
+
 	if(ShmId <= 0)
 	{
 		printf("shmget failed...\n");
@@ -108,7 +107,7 @@ unsigned int IndepRand()
 	unsigned int Ret;
 	unsigned int X = fread((char *) &Ret, 1, sizeof(unsigned int), F);
 	fclose(F);
-	
+
 	return Ret;
 }
 // Funkcja której zadaniem jest uruchomić nowy proces, wykonać zadaną funkcję i zakończyć żywot
@@ -121,13 +120,13 @@ void CreateSubProc(void (*JumpFunction)())
 		exit(0);
 	}
 }
-void ServiceCenter()
+void ServiceCenter() // TODO
 {
 	printf("[ServiceCenter] Poczatek zycia\n");
-	
+
 	struct PriorityQueue * Queues = BindQueues();
 	struct ProjectSemaphores * Semaphores = BindSemaphores();
-	
+
 	unsigned int AlarmsProcessed = 0;
 	while(AlarmsProcessed < (Global_LowPriorityProbes + Global_HighPriorityProbes) * Global_AlarmsPerProbe)
 	{
@@ -139,57 +138,57 @@ void ServiceCenter()
 		{
 			//Lock mutex
 			sem_wait(&Semaphores->QueueLock[I]);
-			
+
 			int QueueFreeSpace;
 			sem_getvalue(&Semaphores->QueueFreeSpace[I], &QueueFreeSpace);
-			
+
 			if(QueueFreeSpace < Global_QueueLength)
 				QueueId = I;
-			
+
 			//Unlock mutex
 			sem_post(&Semaphores->QueueLock[I]);
-			
+
 			if(QueueId >= 0)
 				break;
 		}
-		
+
 		sem_wait(&Semaphores->QueueLock[QueueId]);
 		unsigned int R = QueueGetElement(&Queues[QueueId]);
 		sem_post(&Semaphores->QueueLock[QueueId]);
 		sem_post(&Semaphores->QueueFreeSpace[QueueId]);
-		
+
 		printf("[ServiceCenter] Sonda z kolejki %d zglasza sygnal: |%d|\n", QueueId, R);
-		
+
 		AlarmsProcessed++;
 	}
-	
+
 	printf("[ServiceCenter] Koniec zycia\n");
 }
-void Producer(unsigned short QueueId)
+void Producer(unsigned short QueueId) // TODO
 {
 	unsigned short MyId = getpid();
 	printf("Start zycia producenta: %d\n", MyId);
 	struct PriorityQueue * Queues = BindQueues();
 	struct ProjectSemaphores * Semaphores = BindSemaphores();
-	
+
 	unsigned int SentAlarms = 0;
 	while(SentAlarms < Global_AlarmsPerProbe)
 	{
 		usleep((IndepRand() % 500000));
 		sem_wait(&Semaphores->QueueFreeSpace[QueueId]);
-		
+
 		sem_wait(&Semaphores->QueueLock[QueueId]);
 		unsigned int SignalId = IndepRand() % 10;
 		unsigned int AlarmId = MyId * 1000 + SignalId;
 		QueueInsertElement(&Queues[QueueId], AlarmId);
 		printf("[Kolejka: %d] Zglaszam sygnal %d, moje id to: %d = numer alarmu: |%d|\n", QueueId, SignalId, MyId, AlarmId);
 		sem_post(&Semaphores->QueueLock[QueueId]);
-		
+
 		sem_post(&Semaphores->DataInQueues);
-		
+
 		SentAlarms++;
 	}
-	
+
 	printf("[Kolejka: %d] Koniec zycia sondy: %d\n", QueueId, MyId);
 }
 int main(unsigned int ArgC, char ** ArgV) // done
@@ -203,11 +202,11 @@ int main(unsigned int ArgC, char ** ArgV) // done
 	Global_NumberOfBuffers = atoi(ArgV[2]);
 	Global_NumberOfProducers = atoi(ArgV[3]);
 	Global_MessagePerProbe = atoi(ArgV[4]);
-	
+
 	//Create shared memory
 	InitBuffers();
 	InitSemaphores();
-	
+
 	//Launch consumer
 	CreateSubProc(&Consumer);
 	//Launch producers
