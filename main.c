@@ -133,7 +133,7 @@ void Consumer() // Done
 	size_t messagesAlreadyProceed = 0;
 	while(messagesAlreadyProceed < Global_MessagesPerProducer * Global_NumberOfProducers)
 	{
-		usleep((IndepRand() % 500000));
+		usleep((IndepRand() % 50000));
 		sem_wait(&semaphores->isThereAnyDataInBuffers);
 
 		unsigned int randomBuffer = 0;
