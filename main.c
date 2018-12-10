@@ -30,6 +30,7 @@ void BufferInsertElement(struct Buffer * pointerToBuffer, unsigned int Element) 
 	pointerToBuffer->end++;
 	pointerToBuffer->end %= Global_BufferLength;
 }
+
 unsigned int BufferGetElement(struct Buffer * pointerToBuffer) // Done
 {
 	unsigned int Element = pointerToBuffer->intBuffer[pointerToBuffer->start];
@@ -38,11 +39,11 @@ unsigned int BufferGetElement(struct Buffer * pointerToBuffer) // Done
 	return Element;
 }
 
-struct PriorityQueue * BindQueues()
+struct Buffer * BindBuffers() // Done
 {
 	static int ShmId = 0;
 	if(ShmId == 0)
-		ShmId = shmget(IPC_PRIVATE, N_PRIORITIES * sizeof(struct PriorityQueue) + N_PRIORITIES * Global_QueueLength * sizeof(unsigned int), SHM_W | SHM_R);
+		ShmId = shmget(IPC_PRIVATE, Global_NumberOfBuffers * sizeof(struct Buffer) + Global_NumberOfBuffers * Global_QueueLength * sizeof(unsigned int), SHM_W | SHM_R);
 
 	if(ShmId <= 0)
 	{
@@ -51,26 +52,26 @@ struct PriorityQueue * BindQueues()
 	}
 	void * Data = shmat(ShmId, NULL, 0);
 
-	struct PriorityQueue * Queues = (struct PriorityQueue *) Data;
-	for(unsigned int I = 0; I < N_PRIORITIES; I++)
-		Queues[I].Alarms = Data + N_PRIORITIES * sizeof(struct PriorityQueue) + I * Global_QueueLength * sizeof(unsigned int);
+	struct Buffer * Buffers = (struct Buffer *) Data;
+	for(size_t i = 0; i < Global_NumberOfBuffers)
+		Buffers[i].intBuffer = Data + Global_NumberOfBuffers * sizeof(struct Buffer) + I * Global_QueueLength * sizeof(unsigned int);
 
-	return Queues;
+	return Buffers;
 }
-struct PriorityQueue * InitQueues()
+struct PriorityQueue * InitQueues() // TODO
 {
 	struct PriorityQueue * Queues = BindQueues();
 	memset(Queues, 0, N_PRIORITIES * sizeof(struct PriorityQueue));
 	return Queues;
 }
 
-struct ProjectSemaphores
+struct ProjectSemaphores // Done
 {
 	sem_t BufferLock[Global_NumberOfBuffers];
 	sem_t BufferFreeSpace[Global_NumberOfBuffers];
 	sem_t DataInQueues;
 };
-struct ProjectSemaphores * BindSemaphores()
+struct ProjectSemaphores * BindSemaphores() // TODO
 {
 	static int ShmId = 0;
 	if(ShmId == 0)
@@ -83,7 +84,8 @@ struct ProjectSemaphores * BindSemaphores()
 	}
 	return (struct ProjectSemaphores *) shmat(ShmId, NULL, 0);
 }
-struct ProjectSemaphores * InitSemaphores()
+
+struct ProjectSemaphores * InitSemaphores() // TODO
 {
 	struct ProjectSemaphores * PS = BindSemaphores();
 	for(unsigned int I = 0; I < N_PRIORITIES; I++)
@@ -95,8 +97,7 @@ struct ProjectSemaphores * InitSemaphores()
 	return PS;
 }
 
-
-unsigned int IndepRand()
+unsigned int IndepRand() // Done
 {
 	FILE * F = fopen("/dev/urandom", "r");
 	if(!F)
@@ -111,7 +112,7 @@ unsigned int IndepRand()
 	return Ret;
 }
 // Funkcja której zadaniem jest uruchomić nowy proces, wykonać zadaną funkcję i zakończyć żywot
-void CreateSubProc(void (*JumpFunction)())
+void CreateSubProc(void (*JumpFunction)()) // Done
 {
 	int ForkResult = fork();
 	if(ForkResult == 0) // execute only if we are child
@@ -191,7 +192,7 @@ void Producer(unsigned short QueueId) // TODO
 
 	printf("[Kolejka: %d] Koniec zycia sondy: %d\n", QueueId, MyId);
 }
-int main(unsigned int ArgC, char ** ArgV) // done
+int main(unsigned int ArgC, char ** ArgV) // Done
 {
 	if(ArgC != 5)
 	{
