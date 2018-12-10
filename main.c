@@ -214,7 +214,7 @@ void Producer(unsigned short QueueId) // TODO
 }
 int main(unsigned int ArgC, char ** ArgV) // Done
 {
-	if(ArgC != 5)
+	if(ArgC != 4)
 	{
 		printf("%s Dlugosc buforow/ Ilosc producentow/ Ilosc produktow na 1 producenta\n", ArgV[0]);
 		return 1;
