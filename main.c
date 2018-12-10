@@ -143,29 +143,10 @@ void Consumer() // Done
 			randomBuffer = IndepRand() % N_BUFFERS;
 			sem_wait(&semaphores->BufferLock[randomBuffer]);
 			sem_getvalue(&semaphores->BufferFreeSpace[randomBuffer], &freeSpaceInBuffer);
+			sem_post(&semaphores->BufferLock[randomBuffer]);
 			if(freeSpaceInBuffer < Global_BufferLength)
 				break;
 		}
-		/*
-		int QueueId = -1;
-		for(unsigned int I = 0; I < N_PRIORITIES; I++)
-		{
-			//Lock mutex
-			sem_wait(&Semaphores->QueueLock[I]);
-
-			int QueueFreeSpace;
-			sem_getvalue(&Semaphores->QueueFreeSpace[I], &QueueFreeSpace);
-
-			if(QueueFreeSpace < Global_QueueLength)
-				QueueId = I;
-
-			//Unlock mutex
-			sem_post(&Semaphores->QueueLock[I]);
-
-			if(QueueId >= 0)
-				break;
-		}*/
-
 		sem_wait(&semaphores->BufferLock[randomBuffer]);
 		unsigned int element = BufferGetElement(&buffers[randomBuffer]);
 		sem_post(&semaphores->BufferLock[randomBuffer]);
@@ -235,13 +216,12 @@ int main(unsigned int ArgC, char ** ArgV) // Done
 {
 	if(ArgC != 5)
 	{
-		printf("%s Dlugosc buforow/ Ilosc buforow/ Ilosc producentow/ Ilosc produktow na 1 producenta", ArgV[0]);
+		printf("%s Dlugosc buforow/ Ilosc producentow/ Ilosc produktow na 1 producenta\n", ArgV[0]);
 		return 1;
 	}
 	Global_BufferLength = atoi(ArgV[1]);
-	//N_BUFFERS = atoi(ArgV[2]);
-	Global_NumberOfProducers = atoi(ArgV[3]);
-	Global_MessagesPerProducer = atoi(ArgV[4]);
+	Global_NumberOfProducers = atoi(ArgV[2]);
+	Global_MessagesPerProducer = atoi(ArgV[3]);
 
 	//Create shared memory
 	InitBuffers();
