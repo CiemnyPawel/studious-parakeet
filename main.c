@@ -19,20 +19,20 @@ unsigned int Global_BufferLength = 0;
 unsigned int Global_NumberOfProducers = 0;
 unsigned int Global_MessagesPerProducer = 0;
 
-struct Buffer // Buffer
+struct Buffer
 {
 	unsigned int * intBuffer;
 	unsigned int start, end;
 };
 
-void BufferInsertElement(struct Buffer * pointerToBuffer, unsigned int element) // Done
+void BufferInsertElement(struct Buffer * pointerToBuffer, unsigned int element)
 {
 	pointerToBuffer->intBuffer[pointerToBuffer->end] = element;
 	pointerToBuffer->end++;
 	pointerToBuffer->end %= Global_BufferLength;
 }
 
-unsigned int BufferGetElement(struct Buffer * pointerToBuffer) // Done
+unsigned int BufferGetElement(struct Buffer * pointerToBuffer)
 {
 	unsigned int element = pointerToBuffer->intBuffer[pointerToBuffer->start];
 	pointerToBuffer->start++;
@@ -40,7 +40,7 @@ unsigned int BufferGetElement(struct Buffer * pointerToBuffer) // Done
 	return element;
 }
 
-struct Buffer * BindBuffers() // Done
+struct Buffer * BindBuffers()
 {
 	static int shmId = 0;
 	if(shmId == 0)
@@ -60,20 +60,20 @@ struct Buffer * BindBuffers() // Done
 	return buffers;
 }
 
-struct Buffer * InitBuffers() // Done
+struct Buffer * InitBuffers()
 {
 	struct Buffer * buffers = BindBuffers();
 	memset(buffers, 0, N_BUFFERS * sizeof(struct Buffer));
 	return buffers;
 }
 
-struct ProjectSemaphores // Done
+struct ProjectSemaphores
 {
 	sem_t BufferLock[N_BUFFERS];
 	sem_t BufferFreeSpace[N_BUFFERS];
 	sem_t isThereAnyDataInBuffers;
 };
-struct ProjectSemaphores * BindSemaphores() // Done
+struct ProjectSemaphores * BindSemaphores()
 {
 	static int shmId = 0;
 	if(shmId == 0)
@@ -87,7 +87,7 @@ struct ProjectSemaphores * BindSemaphores() // Done
 	return (struct ProjectSemaphores *) shmat(shmId, NULL, 0);
 }
 
-struct ProjectSemaphores * InitSemaphores() // Done
+struct ProjectSemaphores * InitSemaphores()
 {
 	struct ProjectSemaphores * PS = BindSemaphores();
 	for(size_t i = 0; i < N_BUFFERS; i++)
@@ -99,7 +99,7 @@ struct ProjectSemaphores * InitSemaphores() // Done
 	return PS;
 }
 
-unsigned int IndepRand() // Done
+unsigned int IndepRand()
 {
 	FILE * F = fopen("/dev/urandom", "r");
 	if(!F)
@@ -113,17 +113,17 @@ unsigned int IndepRand() // Done
 
 	return randomValue;
 }
-// Funkcja której zadaniem jest uruchomić nowy proces, wykonać zadaną funkcję i zakończyć żywot
-void CreateSubProc(void (*JumpFunction)()) // Done
+
+void CreateSubProc(void (*JumpFunction)())
 {
 	int ForkResult = fork();
-	if(ForkResult == 0) // execute only if we are child
+	if(ForkResult == 0)
 	{
 		JumpFunction();
 		exit(0);
 	}
 }
-void Consumer() // Done
+void Consumer()
 {
 	printf("Consumer has started\n");
 
@@ -182,7 +182,7 @@ unsigned int SearchEmptiestBuffer()
 	return numberOfEmptiestBuffer;
 }
 
-void Producer(unsigned short QueueId) // TODO
+void Producer(unsigned short QueueId)
 {
 	unsigned short myId = getpid();
 	printf("Producer nr: %d has started\n", myId);
@@ -212,7 +212,7 @@ void Producer(unsigned short QueueId) // TODO
 
 	printf("Producer nr: %d has finished his job\n", myId);
 }
-int main(unsigned int ArgC, char ** ArgV) // Done
+int main(unsigned int ArgC, char ** ArgV)
 {
 	if(ArgC != 4)
 	{
@@ -223,17 +223,13 @@ int main(unsigned int ArgC, char ** ArgV) // Done
 	Global_NumberOfProducers = atoi(ArgV[2]);
 	Global_MessagesPerProducer = atoi(ArgV[3]);
 
-	//Create shared memory
 	InitBuffers();
 	InitSemaphores();
 
-	//Launch consumer
-	CreateSubProc(&Consumer);
-	//Launch producers
+	CreateSubProc((void*) * Consumer);
 	for(size_t i = 0; i < Global_NumberOfProducers; i++)
-		CreateSubProc(&Producer);
+		CreateSubProc((void*) * Producer);
 
-	//Work until there are children
 	while(wait(NULL) > 0) {}
 	return 0;
 }
