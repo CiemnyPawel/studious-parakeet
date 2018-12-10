@@ -13,9 +13,10 @@
 
 #include <time.h>
 
+#define N_BUFFERS 10
+
 unsigned int Global_BufferLength = 0;
 unsigned int Global_NumberOfProducers = 0;
-unsigned int Global_NumberOfBuffers=0;
 unsigned int Global_MessagesPerProducer = 0;
 
 struct Buffer // Buffer
@@ -43,7 +44,7 @@ struct Buffer * BindBuffers() // Done
 {
 	static int shmId = 0;
 	if(shmId == 0)
-		shmId = shmget(IPC_PRIVATE, Global_NumberOfBuffers * sizeof(struct Buffer) + Global_NumberOfBuffers * Global_QueueLength * sizeof(unsigned int), SHM_W | SHM_R);
+		shmId = shmget(IPC_PRIVATE, N_BUFFERS * sizeof(struct Buffer) + N_BUFFERS * Global_BufferLength * sizeof(unsigned int), SHM_W | SHM_R);
 
 	if(shmId <= 0)
 	{
@@ -53,8 +54,8 @@ struct Buffer * BindBuffers() // Done
 	void * data = shmat(shmId, NULL, 0);
 
 	struct Buffer * buffers = (struct Buffer *) data;
-	for(size_t i = 0; i < Global_NumberOfBuffers)
-		buffers[i].intBuffer = data + Global_NumberOfBuffers * sizeof(struct Buffer) + i * Global_QueueLength * sizeof(unsigned int);
+	for(size_t i = 0; i < N_BUFFERS; i++)
+		buffers[i].intBuffer = data + N_BUFFERS * sizeof(struct Buffer) + i * Global_BufferLength * sizeof(unsigned int);
 
 	return buffers;
 }
@@ -62,14 +63,14 @@ struct Buffer * BindBuffers() // Done
 struct Buffer * InitBuffers() // Done
 {
 	struct Buffer * buffers = BindBuffers();
-	memset(buffers, 0, Global_NumberOfBuffers * sizeof(struct Buffer));
+	memset(buffers, 0, N_BUFFERS * sizeof(struct Buffer));
 	return buffers;
 }
 
 struct ProjectSemaphores // Done
 {
-	sem_t BufferLock[Global_NumberOfBuffers];
-	sem_t BufferFreeSpace[Global_NumberOfBuffers];
+	sem_t BufferLock[N_BUFFERS];
+	sem_t BufferFreeSpace[N_BUFFERS];
 	sem_t isThereAnyDataInBuffers;
 };
 struct ProjectSemaphores * BindSemaphores() // Done
@@ -89,7 +90,7 @@ struct ProjectSemaphores * BindSemaphores() // Done
 struct ProjectSemaphores * InitSemaphores() // Done
 {
 	struct ProjectSemaphores * PS = BindSemaphores();
-	for(size_t i = 0; i < Global_NumberOfBuffers)
+	for(size_t i = 0; i < N_BUFFERS; i++)
 	{
 		sem_init(&PS->BufferLock[i], 1, 1);
 		sem_init(&PS->BufferFreeSpace[i], 1, Global_BufferLength);
@@ -137,9 +138,9 @@ void Consumer() // Done
 
 		unsigned int randomBuffer = 0;
 		unsigned int freeSpaceInBuffer = Global_BufferLength;
-		while(true)
+		while(1==1)
 		{
-			randomBuffer = IndepRand() % Global_NumberOfBuffers;
+			randomBuffer = IndepRand() % N_BUFFERS;
 			sem_wait(&semaphores->BufferLock[randomBuffer]);
 			sem_getvalue(&semaphores->BufferFreeSpace[randomBuffer], &freeSpaceInBuffer);
 			if(freeSpaceInBuffer < Global_BufferLength)
@@ -183,7 +184,7 @@ unsigned int SearchEmptiestBuffer()
 	unsigned int freeSpaceInBuffer = 0;
 	unsigned int emptiestBuffer = 0;
 	unsigned int numberOfEmptiestBuffer = 0;
-	for(size_t i =0; i < Global_NumberOfBuffers; i++)
+	for(size_t i =0; i < N_BUFFERS; i++)
 	{
 		sem_wait(&semaphores->BufferLock[i]);
 		sem_getvalue(&semaphores->BufferFreeSpace[i], &freeSpaceInBuffer);
@@ -194,7 +195,7 @@ unsigned int SearchEmptiestBuffer()
 		}
 	}
 
-	for(size_t i = 0; i < Global_NumberOfBuffers; i++)
+	for(size_t i = 0; i < N_BUFFERS; i++)
 		sem_post(&semaphores->BufferLock[i]);
 
 	return numberOfEmptiestBuffer;
@@ -203,7 +204,7 @@ unsigned int SearchEmptiestBuffer()
 void Producer(unsigned short QueueId) // TODO
 {
 	unsigned short myId = getpid();
-	printf("Producer nr: %d has started\n", MyId);
+	printf("Producer nr: %d has started\n", myId);
 	struct Buffer * buffers = BindBuffers();
 	struct ProjectSemaphores * semaphores = BindSemaphores();
 
@@ -238,7 +239,7 @@ int main(unsigned int ArgC, char ** ArgV) // Done
 		return 1;
 	}
 	Global_BufferLength = atoi(ArgV[1]);
-	Global_NumberOfBuffers = atoi(ArgV[2]);
+	//N_BUFFERS = atoi(ArgV[2]);
 	Global_NumberOfProducers = atoi(ArgV[3]);
 	Global_MessagesPerProducer = atoi(ArgV[4]);
 
